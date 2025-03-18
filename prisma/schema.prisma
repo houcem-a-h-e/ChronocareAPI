@@ -24,6 +24,7 @@ model Patient {
   numeroDeTelephone         String
   isActive                  Boolean  @default(false)
   role                      String   @default("PATIENT")
+  avatar             String?  // Add this
 }
 
 model PersonnnelDeSante {
@@ -40,6 +41,8 @@ model PersonnnelDeSante {
   type                      String
   isActive                  Boolean  @default(false)
   role                      String   @default("HEALTH_PERSONNEL")
+  genre              String?  // Add this
+  avatar             String?  // Add this
 }
 
 model Admin {
@@ -51,4 +54,5 @@ model Admin {
   createdAt                 DateTime @default(now())
   numeroDeTelephone         String
   role                      String   @default("ADMIN")
+  avatar             String?  // Add this
 }

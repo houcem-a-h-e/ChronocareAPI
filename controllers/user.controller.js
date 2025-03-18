@@ -1,7 +1,53 @@
 import prisma from "../lib/prisma.js";
 import bcrypt from "bcrypt";
+import multer from "multer";
+import path from "path";
 
 
+
+export const updateUserProfile = async (req, res) => {
+  try {
+    const dateDeNaissance = new Date(req.body.dateDeNaissance);
+    if (isNaN(dateDeNaissance)) {
+      return res.status(400).json({ message: "Invalid date format" });
+    }
+    const { role } = req.user;
+    const { id } = req.params;
+    // Determine which model to use based on user role
+    const modelMap = {
+      'HEALTH_PERSONNEL': prisma.personnnelDeSante,
+      'PATIENT': prisma.patient,
+      'ADMIN': prisma.admin
+    };
+    const userModel = modelMap[req.user.role]; // Get role from verified token
+    // Handle form data fields from multipart/form-data
+    const dataToUpdate = {
+      genre: req.body.genre,
+      dateDeNaissance: new Date(req.body.dateDeNaissance), // Convert to Date
+      numeroDeTelephone: req.body.numeroDeTelephone,
+      email: req.body.email,
+      specialiteMedical: req.body.specialiteMedical,
+    };
+
+    if (req.file) {
+      dataToUpdate.avatar = `/uploads/${req.file.filename}`;
+    }
+
+    const updatedUser = await  userModel.update({
+      where: { id: req.params.id },
+      data: dataToUpdate,
+    });
+
+    const { password, ...rest } = updatedUser;
+    res.status(200).json(rest);
+  } catch (err) {
+    console.error("Detailed error:", err);
+    res.status(500).json({ 
+      message: "Failed to update profile",
+      error: err.message 
+    });
+  }
+};
 export const getUser = async (req, res) => {
   const id = req.params.id;
   try {
