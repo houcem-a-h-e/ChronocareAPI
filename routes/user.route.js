@@ -8,9 +8,11 @@ import {
   savePost,
   profilePosts,
   getNotificationNumber,
-  updateUserProfile 
+  updateUserProfile,
+  addChatMessage
 } from "../controllers/user.controller.js";
 import {verifyToken} from "../middleware/verifyToken.js";
+import { verify } from "crypto";
 
 const router = express.Router();
 // router.get("/search/:id", verifyToken, getUser);
@@ -29,7 +31,7 @@ router.delete("/:id", verifyToken, deleteUser);
 router.post("/save", verifyToken, savePost);
 router.get("/profilePosts", verifyToken, profilePosts);
 router.get("/notification", verifyToken, getNotificationNumber);
-// Modify your route to handle upload errors
+router.post("/chat", verifyToken, addChatMessage)// Modify your route to handle upload errors
 router.patch(
   "/users/:id/profile",
   verifyToken,
