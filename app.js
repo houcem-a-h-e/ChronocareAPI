@@ -6,7 +6,7 @@ import userRoute from "./routes/user.route.js";
 
 const app = express();
 let port = process.env.PORT || 4000
-app.use(cors({ origin: "*"
+app.use(cors({ origin: "https://chronocareapp.netlify.app/"
   //process.env.CLIENT_URL
   , credentials: true }));
 app.use(express.json()); // Keep this for non-file routes
