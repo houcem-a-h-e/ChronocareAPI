@@ -6,9 +6,20 @@ import userRoute from "./routes/user.route.js";
 
 const app = express();
 let port = process.env.PORT || 4000
-app.use(cors({ origin: "https://chronocareapp.netlify.app"
-  //process.env.CLIENT_URL
-  , credentials: true }));
+const allowedOrigins = ["https://chronocareapp.netlify.app"];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.use(express.json()); // Keep this for non-file routes
 app.use(express.urlencoded({ extended: true })); // Add for form data
 app.use(cookieParser());
