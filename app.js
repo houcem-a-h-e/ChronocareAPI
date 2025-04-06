@@ -5,21 +5,8 @@ import authRoute from "./routes/auth.route.js";
 import userRoute from "./routes/user.route.js";
 
 const app = express();
-let port = process.env.PORT || 4000
-const allowedOrigins = ["https://chronocareapp.netlify.app"];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH","OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+let port = process.env.PORT || 8800
+app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json()); // Keep this for non-file routes
 app.use(express.urlencoded({ extended: true })); // Add for form data
 app.use(cookieParser());
