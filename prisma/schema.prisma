@@ -12,20 +12,114 @@ datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
 }
+model PatientDossier {
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  dossierNumber    String         @unique
+  fullName         String
+  gender           String
+  birthDate        DateTime
+  phone            String
+  email            String
+  address          String?
+  bloodGroup       String?
+  chronicDisease   Boolean        @default(false)
+  diseaseDetails   String?
+  weight           Float?
+  height           Float?
+  medicalDocument  String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  // Relations
+  patientEmail        String         
+  personnelId      String         @db.ObjectId
+  patient          Patient        @relation(fields: [patientEmail], references: [email])
+  personnel        PersonnnelDeSante @relation(fields: [personnelId], references: [id])
+  consultations    Consultation[]
+  
+  // Indexes
+  @@index([patientEmail])
+  @@index([personnelId])
+}
+
+model RendezVous {
+   id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  dateHeure        DateTime
+  statut           String         @default("PLANNED") // PLANNED, CONFIRMED, CANCELLED, COMPLETED
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  remarks          String
+  typeDeVisite     String
+  // Relations (only to Patient and Personnel)
+  patientEmail        String         
+  personnelEmail      String         
+  patient          Patient        @relation(fields: [patientEmail], references: [email])
+  personnel        PersonnnelDeSante @relation(fields: [personnelEmail], references: [email])
+  
+  // Indexes
+  @@index([patientEmail])
+  @@index([personnelEmail])
+  @@index([dateHeure])
+}
+
+model Consultation {
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  motifConsultation String
+  date             DateTime       @default(now())
+  doctorEmail      String         // Correction ici
+  patientEmail     String
+  AntecedentsMedicaux String
+  symptomesObservees String[]     // Tableau pour plusieurs symptômes
+  ExamenComplementairesDemandes String
+  prochainRdv      DateTime?      
+  Diagnostic       String?
+  prescription     String?
+  document         String?
+  notes            String?        // Ajouté pour les notes libres
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  dossierId        String         @db.ObjectId
+  personnelEmail   String      
+  dossier          PatientDossier @relation(fields: [dossierId], references: [id])
+  patient          Patient @relation(fields: [patientEmail], references: [email])
+  personnel        PersonnnelDeSante @relation(fields: [personnelEmail], references: [email])
+  @@index([dossierId])
+  @@index([personnelEmail])
+}
+
+
+
+
 
 model Patient {
-  id                        String   @id @default(auto()) @map("_id") @db.ObjectId
-  email                     String   @unique
-  nom                       String      
-  prenom                    String
-  password                  String
-  createdAt                 DateTime @default(now())
-  civilite                  String
-  numeroDeTelephone         String
-  isActive                  Boolean  @default(false)
-  role                      String   @default("PATIENT")
-  avatar             String?  // Add this
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  email             String   @unique
+  nom               String      
+  prenom            String
+  password          String
+  createdAt         DateTime @default(now())
+  civilite          String
+  numeroDeTelephone String
+  isActive          Boolean  @default(false)
+  role              String   @default("PATIENT")
+  avatar            String?  
+  dossiers          PatientDossier[]
+  rendezVous        RendezVous[]
+  consultations     Consultation[]
+
+  kids              Kid[]    @relation("PatientKids")
 }
+
+model Kid {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  firstName   String
+  lastName    String
+  birthDate   DateTime
+  patientId   String   @db.ObjectId
+  patient     Patient  @relation(fields: [patientId], references: [id], name: "PatientKids")
+}
+
+
 
 model PersonnnelDeSante {
   id                        String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -39,10 +133,14 @@ model PersonnnelDeSante {
   specialiteMedical         String
   numeroDeTelephone         String
   type                      String
+  cin                       String  @unique
   isActive                  Boolean  @default(false)
   role                      String   @default("HEALTH_PERSONNEL")
   genre              String?  // Add this
   avatar             String?  // Add this
+  createdDossiers PatientDossier[]
+  createdRendezVous         RendezVous[]
+  createdConsultations      Consultation[]
 }
 
 model Admin {

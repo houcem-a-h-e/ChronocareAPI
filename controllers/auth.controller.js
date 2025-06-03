@@ -66,7 +66,7 @@ export const registerPatient = async (req, res) => {
 
 export const registerPersonnnelDeSante = async (req, res) => {
   const { nom, prenom, email, password, dateDeNaissance, numeroIdentificationProfessionnelle,
-    specialiteMedical, numeroDeTelephone, type } = req.body;
+    specialiteMedical, numeroDeTelephone, cin, type } = req.body;
 
   try {
     // HASH THE PASSWORD
@@ -97,6 +97,7 @@ export const registerPersonnnelDeSante = async (req, res) => {
         numeroIdentificationProfessionnelle,
         specialiteMedical,
         numeroDeTelephone,
+        cin,
         type,
         isActive: false
       },
@@ -104,7 +105,7 @@ export const registerPersonnnelDeSante = async (req, res) => {
 
     console.log(newPersonnelDeSante);
 
-    res.status(201).json({ message: "PersonnelDeSante created successfully" });
+    res.status(201).json({ message: "Personnel De Sante created successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to create PersonnelDeSante!" });

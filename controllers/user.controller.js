@@ -2,9 +2,11 @@ import prisma from "../lib/prisma.js";
 import bcrypt from "bcrypt";
 import multer from "multer";
 import path from "path";
-
-
-
+import { pipeline, env , Tensor} from '@xenova/transformers'; // Added env import
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid'
+import { createRequire } from 'node:module';
 export const updateUserProfile = async (req, res) => {
   try {
     const dateDeNaissance = new Date(req.body.dateDeNaissance);
@@ -191,56 +193,556 @@ export const getNotificationNumber = async (req, res) => {
     res.status(500).json({ message: "Failed to get profile posts!" });
   }
 };
-
-
-// Backend Controller
-export const addChatMessage = async (req, res) => {
-  const { language, message } = req.body;
-
-  const qna = {
-    fr: [
-      { pattern: /comment.*va/i, response: "Je suis fantastique" },
-      { pattern: /créer.*compte/i, response: "Vous pouvez créer un compte en entrant votre numéro national et en fournissant une pièce d'identité. Rendez-vous sur la page d'inscription et suivez les instructions." },
-      { pattern: /historique.*médical/i, response: "Vous pouvez consulter votre historique médical en vous connectant à votre compte, puis en accédant à la section 'Historique médical'." },
-      { pattern: /télécharger.*ordonnances/i, response: "Oui, vous pouvez télécharger vos ordonnances au format PDF depuis la section 'Ordonnances' de votre compte." },
-      { pattern: /qui.*accéder.*dossier/i, response: "Seulement vous, votre médecin traitant et certains spécialistes autorisés peuvent accéder à votre dossier médical." },
-      { pattern: /modifier.*informations/i, response: "Vous pouvez modifier vos informations personnelles en allant dans 'Paramètres', puis en sélectionnant 'Modifier les informations personnelles'. Vous devrez peut-être fournir des documents justificatifs pour certaines modifications." },
-      { pattern: /oublie.*mot de passe/i, response: "Cliquez sur 'Mot de passe oublié' sur la page de connexion et suivez les instructions pour le réinitialiser." },
-      { pattern: /ajouter.*ordonnance/i, response: "Votre médecin peut ajouter de nouvelles ordonnances directement à votre dossier via la plateforme ChronoCare." },
-      { pattern: /données.*sécurisées/i, response: "Oui, ChronoCare utilise un chiffrement avancé et respecte les lois de protection des données comme le GDPR." },
-      { pattern: /partager.*dossier/i, response: "Oui, vous pouvez créer un lien sécurisé qui donne au médecin un accès temporaire à votre dossier." },
-      { pattern: /supprimer.*compte/i, response: "Vous pouvez demander la suppression de votre compte en allant dans 'Paramètres', puis en cliquant sur 'Supprimer le compte'." }
-    ],
-    ar: [
-      { pattern: /كيف.*حالك/i, response: "أنا رائع" },
-      { pattern: /إنشاء.*حساب/i, response: "يمكنك إنشاء حساب بإدخال رقم هويتك الوطنية وتقديم إثبات هوية. انتقل إلى صفحة التسجيل واتبع التعليمات." },
-      { pattern: /تاريخي.*طبي/i, response: "يمكنك مشاهدة تاريخك الطبي عن طريق تسجيل الدخول إلى حسابك، ثم الانتقال إلى قسم 'التاريخ الطبي'." },
-      { pattern: /تحميل.*وصفات/i, response: "نعم، يمكنك تنزيل وصفاتك الطبية بصيغة PDF من قسم 'الوصفات الطبية' في حسابك." },
-      { pattern: /من.*يمكنه.*الوصول/i, response: "فقط أنت، وطبيبك المعالج، وبعض المتخصصين المصرح لهم يمكنهم الوصول إلى ملفك الطبي." },
-      { pattern: /تعديل.*بيانات/i, response: "يمكنك تعديل بياناتك من خلال الذهاب إلى 'الإعدادات' ثم اختيار 'تعديل المعلومات الشخصية'. قد تحتاج إلى تقديم وثائق داعمة لبعض التعديلات." },
-      { pattern: /نسيت.*كلمة.*المرور/i, response: "اضغط على 'نسيت كلمة المرور' في صفحة تسجيل الدخول واتبع التعليمات لإعادة تعيينها." },
-      { pattern: /إضافة.*وصفة/i, response: "يمكن لطبيبك إضافة وصفات طبية جديدة مباشرة إلى ملفك عبر منصة ChronoCare." },
-      { pattern: /بياناتي.*آمنة/i, response: "نعم، تستخدم ChronoCare تشفيرًا متقدمًا وتلتزم بقوانين حماية البيانات مثل GDPR." },
-      { pattern: /مشاركة.*ملفي/i, response: "نعم، يمكنك إنشاء رابط آمن يمنح الطبيب الآخر حق الوصول المؤقت إلى ملفك." },
-      { pattern: /حذف.*حساب/i, response: "يمكنك طلب حذف حسابك من خلال الانتقال إلى 'الإعدادات' ثم الضغط على 'حذف الحساب'." }
-    ]
-  };
-
+export const createRendezVous = async (req, res) => {
   try {
-    const langQna = qna[language] || [];
-    const matched = langQna.find(q => q.pattern.test(message));
-    
-    if (matched) {
-      return res.json({
-        response: matched.response,
-        language: language
+    const { patientEmail, dateHeure, remarks, typeDeVisite } = req.body;
+    const personnelId = req.user.id;
+
+    if (!patientEmail || !dateHeure || !remarks || !typeDeVisite) {
+      return res.status(400).json({ message: "Champs obligatoires manquants" });
+    }
+
+    // Récupérer l'email du personnel via son id
+    const personnel = await prisma.personnnelDeSante.findUnique({
+      where: { id: personnelId },
+      select: { email: true },
+    });
+
+    if (!personnel) {
+      return res.status(404).json({ message: "Personnel non trouvé" });
+    }
+
+    const personnelEmail = personnel.email;
+
+    // Vérifier conflit de créneau
+    const conflictingAppointment = await prisma.rendezVous.findFirst({
+      where: {
+        personnelEmail,
+        dateHeure: new Date(dateHeure),
+        statut: { in: ["PLANNED", "CONFIRMED"] },
+      },
+    });
+
+    if (conflictingAppointment) {
+      return res.status(400).json({
+        message: "Créneau déjà réservé",
+        conflictingAppointment,
       });
     }
-    
-    return res.status(400).json({ error: 'Question non reconnue' });
-    
+
+    // Créer le rendez-vous
+    const newRendezVous = await prisma.rendezVous.create({
+      data: {
+        dateHeure: new Date(dateHeure),
+        statut: "PLANNED",
+        remarks,
+        typeDeVisite,
+        patientEmail,
+        personnelEmail,
+      },
+      include: {
+        patient: {
+          select: {
+            nom: true,
+            prenom: true,
+            numeroDeTelephone: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json(newRendezVous);
   } catch (error) {
-    console.error('Chat error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error("Error creating rendezvous:", error);
+    res.status(500).json({ message: "Failed to create appointment" });
+  }
+};
+
+
+
+export const getPatientRendezVous = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    // 1. Récupérer le patient pour obtenir son email
+    const patient = await prisma.patient.findUnique({
+      where: { id: patientId },
+      select: { email: true },
+    });
+
+    if (!patient) {
+      return res.status(404).json({ message: "Patient non trouvé" });
+    }
+
+    // 2. Récupérer les rendez-vous via l'email du patient
+    const rendezVous = await prisma.rendezVous.findMany({
+      where: { patientEmail: patient.email },
+      orderBy: { dateHeure: "asc" },
+      include: {
+        personnel: {
+          select: {
+            nom: true,
+            prenom: true,
+            specialiteMedical: true,
+          },
+        },
+      },
+    });
+
+    res.status(200).json(rendezVous);
+  } catch (error) {
+    console.error("Error fetching appointments:", error);
+    res.status(500).json({ message: "Failed to get appointments" });
+  }
+};
+;
+
+
+
+// ====================== NEW DOSSIER CONTROLLERS ======================
+export const createDossier = async (req, res) => {
+  try {
+    const {
+      dossierNumber,
+      fullName,
+      gender,
+      birthDate,
+      phone,
+      email,
+      address,
+      bloodGroup,
+      chronicDisease,
+      diseaseDetails,
+      weight,
+      height,
+      patientId
+    } = req.body;
+
+    // Validate required fields
+    const requiredFields = {
+      dossierNumber: "Dossier number is required",
+      fullName: "Full name is required",
+      gender: "Gender is required",
+      birthDate: "Birth date is required",
+      phone: "Phone number is required",
+      patientId: "Patient ID is required",
+      email: "Email is required"
+    };
+
+    const missingFields = Object.entries(requiredFields)
+      .filter(([field]) => !req.body[field])
+      .map(([_, message]) => message);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({ 
+        message: "Validation failed",
+        errors: missingFields 
+      });
+    }
+
+    const personnelId = req.user.id; // From auth middleware
+
+    // Ensure upload directory exists
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'dossiers');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // Handle file upload if exists
+    let medicalDocumentPath = null;
+    if (req.file) {
+      const ext = path.extname(req.file.originalname);
+      const filename = `${uuidv4()}${ext}`;
+      medicalDocumentPath = `/uploads/dossiers/${filename}`;
+      
+      const destination = path.join(uploadDir, filename);
+      
+      // Move the file to permanent location
+      await fs.promises.rename(req.file.path, destination);
+    }
+
+    const newDossier = await prisma.patientDossier.create({
+      data: {
+        dossierNumber,
+        fullName,
+        gender,
+        birthDate: new Date(birthDate),
+        phone,
+        email: email,
+        address: address || null,
+        bloodGroup: bloodGroup || null,
+        chronicDisease: chronicDisease === 'true',
+        diseaseDetails: diseaseDetails || null,
+        weight: weight ? parseFloat(weight) : null,
+        height: height ? parseFloat(height) : null,
+        medicalDocument: medicalDocumentPath,
+        patient: { connect: { id: patientId } },
+        personnel: { connect: { id: personnelId } }
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            nom: true,
+            prenom: true
+          }
+        }
+      }
+    });
+
+    res.status(201).json(newDossier);
+  } catch (error) {
+    console.error('Error creating dossier:', error);
+    
+    // Clean up uploaded file if error occurred
+    if (req.file && fs.existsSync(req.file.path)) {
+      try {
+        await fs.promises.unlink(req.file.path);
+      } catch (err) {
+        console.error('Error cleaning up file:', err);
+      }
+    }
+
+    res.status(500).json({ 
+      message: 'Failed to create medical dossier',
+      error: error.message 
+    });
+  }
+};
+
+export const getPatientDossiers = async (req, res) => {
+  try {
+    const { email } = req.params;
+    const dossiers = await prisma.patientDossier.findMany({
+      where: { email },
+      include: {
+        consultations: {
+          orderBy: { date: 'desc' }
+        }
+      }
+    });
+    res.status(200).json(dossiers);
+  } catch (error) {
+    console.error('Error fetching dossiers:', error);
+    res.status(500).json({ message: 'Failed to get medical dossiers' });
+  }
+};
+
+
+
+// ====================== NEW CONSULTATION CONTROLLERS ======================
+export const createConsultation = async (req, res) => {
+  try {
+    const {
+      motifConsultation,
+      notes,
+      prescription,
+      doctorEmail,
+      patientEmail,
+      AntecedentsMedicaux,
+      symptomesObservees,
+      ExamenComplementairesDemandes,
+      prochainRdv,
+      Diagnostic,
+    } = req.body;
+
+    // 1. Récupérer le dernier dossier du patient
+    const lastDossier = await prisma.patientDossier.findFirst({
+      where: { patientEmail },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!lastDossier) {
+      return res.status(404).json({ message: "Aucun dossier trouvé pour ce patient" });
+    }
+
+    const dossierId = lastDossier.id;
+
+    // 2. Récupérer le personnel via l'id dans req.user
+    const personnel = await prisma.personnnelDeSante.findUnique({
+      where: { id: req.user.id },
+    });
+
+    if (!personnel) {
+      return res.status(404).json({ message: "Personnel non trouvé" });
+    }
+
+    const personnelEmail = personnel.email;
+
+    // 3. Validation minimale
+    if (!motifConsultation || !doctorEmail || !patientEmail) {
+      return res.status(400).json({ message: "Champs obligatoires manquants" });
+    }
+
+    // 4. Récupérer le chemin du fichier uploadé (si présent)
+    const documentPath = req.file ? req.file.path : null;
+
+    // 5. Créer la consultation
+    const newConsultation = await prisma.consultation.create({
+      data: {
+        motifConsultation,
+        notes,
+        prescription,
+        date: new Date(),
+        doctorEmail,
+        AntecedentsMedicaux,
+        symptomesObservees: symptomesObservees ? JSON.parse(symptomesObservees) : [],
+        ExamenComplementairesDemandes,
+        prochainRdv: prochainRdv ? new Date(prochainRdv) : null,
+        Diagnostic,
+        document: documentPath,
+        dossier: { connect: { id: dossierId } },
+        personnel: { connect: { email: personnelEmail } },
+        patient: { connect: { email: patientEmail } },
+      },
+    });
+
+    res.status(201).json(newConsultation);
+  } catch (error) {
+    console.error("Error creating consultation:", error);
+    res.status(500).json({ message: "Failed to create consultation", error: error.message });
+  }
+};
+
+
+
+export const getDossierConsultations = async (req, res) => {
+  try {
+    const { dossierId } = req.params;
+    const consultations = await prisma.consultation.findMany({
+      where: { dossierId },
+      orderBy: { date: 'desc' },
+      include: {
+        personnel: {
+          select: {
+            nom: true,
+            prenom: true,
+            specialiteMedical: true
+          }
+        }
+      }
+    });
+    res.status(200).json(consultations);
+  } catch (error) {
+    console.error('Error fetching consultations:', error);
+    res.status(500).json({ message: 'Failed to get consultations' });
+  }
+};
+
+export const getPatientById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const patient = await prisma.patient.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        nom: true,
+        prenom: true,
+        numeroDeTelephone: true,
+        email: true
+      }
+    });
+    
+    if (!patient) {
+      return res.status(404).json({ message: "Patient not found" });
+    }
+    
+    res.status(200).json(patient);
+  } catch (error) {
+    console.error('Error fetching patient:', error);
+    res.status(500).json({ message: 'Failed to get patient' });
+  }
+};
+export const getRendezVousByPersonnel = async (req, res) => {
+  try {
+    const personnelId = req.user.id;
+
+    const personnel = await prisma.personnnelDeSante.findUnique({
+      where: { id: personnelId },
+      select: { email: true },
+    });
+
+    if (!personnel) {
+      return res.status(404).json({ message: "Personnel non trouvé" });
+    }
+
+    const personnelEmail = personnel.email;
+
+    const rendezVousList = await prisma.rendezVous.findMany({
+      where: { personnelEmail },
+      orderBy: { dateHeure: "desc" },
+      select: {
+        id: true,
+        patientEmail: true,
+        dateHeure: true,
+        statut: true,
+        typeDeVisite: true,
+        remarks: true,
+        patient: {
+          select: {
+            numeroDeTelephone: true,
+          },
+        },
+      },
+    });
+
+    const formattedList = rendezVousList.map((rdv) => ({
+      id: rdv.id,
+      patientEmail: rdv.patientEmail,
+      dateHeure: rdv.dateHeure,
+      statut: rdv.statut,
+      typeDeVisite: rdv.typeDeVisite,
+      remarks: rdv.remarks,
+      patientPhone: rdv.patient?.numeroDeTelephone || "",
+    }));
+
+    res.json(formattedList);
+  } catch (error) {
+    console.error("Erreur récupération rendez-vous :", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+};
+
+export const updateRendezVousStatut = async (req, res) => {
+  try {
+    const { id } = req.params; // id du rendez-vous
+    const { statut } = req.body; // nouveau statut : "CONFIRMED", "CANCELED" ou "COMPLETED"
+
+    if (!["CONFIRMED", "CANCELED", "COMPLETED"].includes(statut)) {
+      return res.status(400).json({ message: "Statut invalide" });
+    }
+
+    // Récupérer le rendez-vous
+    const rdv = await prisma.rendezVous.findUnique({
+      where: { id },
+      select: { statut: true },
+    });
+
+    if (!rdv) {
+      return res.status(404).json({ message: "Rendez-vous non trouvé" });
+    }
+
+    if (rdv.statut === "COMPLETED") {
+      return res.status(400).json({ message: "Impossible de modifier un rendez-vous déjà complété" });
+    }
+
+    // Mettre à jour le statut
+    const updatedRdv = await prisma.rendezVous.update({
+      where: { id },
+      data: { statut },
+    });
+
+    res.json(updatedRdv);
+  } catch (error) {
+    console.error("Erreur mise à jour statut rendez-vous:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+}
+
+
+export const updatePatientProfile = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { civilite, numeroDeTelephone, email } = req.body;
+    const avatarFile = req.file;
+
+    // Validation simple
+    if (civilite && !["masculin", "feminin"].includes(civilite)) {
+      return res.status(400).json({ message: "Civilité invalide" });
+    }
+
+    // Préparer les données à mettre à jour
+    const dataToUpdate = {};
+    if (civilite) dataToUpdate.civilite = civilite;
+    if (numeroDeTelephone) dataToUpdate.numeroDeTelephone = numeroDeTelephone;
+    if (email) dataToUpdate.email = email;
+    if (avatarFile) dataToUpdate.avatar = `/uploads/${avatarFile.filename}`;
+
+    // Mettre à jour le patient
+    const updatedPatient = await prisma.patient.update({
+      where: { id: userId },
+      data: dataToUpdate,
+    });
+
+    res.status(200).json({ message: "Profil mis à jour avec succès", updatedPatient });
+  } catch (error) {
+    console.error("Erreur updateUserProfile:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+}
+
+
+export const addKidToPatient = async (req, res) => {
+  try {
+    const patientId = req.params.id;
+    const { firstName, lastName, birthDate } = req.body;
+
+    if (!firstName || !lastName || !birthDate) {
+      return res.status(400).json({ message: "Tous les champs sont obligatoires" });
+    }
+
+    const birth = new Date(birthDate);
+    const ageMs = Date.now() - birth.getTime();
+    const age = new Date(ageMs).getUTCFullYear() - 1970;
+    if (age >= 18) {
+      return res.status(400).json({ message: "L'enfant doit avoir moins de 18 ans" });
+    }
+
+    // Vérifier que le patient existe
+    const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+    if (!patient) {
+      return res.status(404).json({ message: "Patient non trouvé" });
+    }
+
+    // Créer l'enfant lié au patient
+    const kid = await prisma.kid.create({
+      data: {
+        firstName,
+        lastName,
+        birthDate: birth,
+        patient: { connect: { id: patientId } },
+      },
+    });
+
+    res.status(201).json({ message: "Enfant ajouté avec succès", kid });
+  } catch (error) {
+    console.error("Erreur ajout enfant :", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+}
+
+export const getPatientRendezVousById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Récupérer l'email du patient via son id
+    const patient = await prisma.patient.findUnique({
+      where: { id },
+      select: { email: true },
+    });
+
+    if (!patient) {
+      return res.status(404).json({ message: "Patient non trouvé" });
+    }
+
+    // 2. Récupérer les rendez-vous via l'email
+    const rendezVous = await prisma.rendezVous.findMany({
+      where: { patientEmail: patient.email },
+      orderBy: { dateHeure: "asc" },
+      include: {
+        personnel: {
+          select: {
+            nom: true,
+            prenom: true,
+            specialiteMedical: true,
+          },
+        },
+      },
+    });
+
+    res.status(200).json(rendezVous);
+  } catch (error) {
+    console.error("Erreur récupération rendez-vous :", error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 };
