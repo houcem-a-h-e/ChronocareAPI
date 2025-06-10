@@ -428,7 +428,51 @@ export const getPatientDossiers = async (req, res) => {
   }
 };
 
+export const deletePatientDossier = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
 
+    // First get the dossier to verify ownership
+    const dossier = await prisma.patientDossier.findUnique({
+      where: { id },
+      include: {
+        patient: true,
+        consultations: true // Include consultations to check if they exist
+      }
+    });
+
+    if (!dossier) {
+      return res.status(404).json({ message: 'Dossier not found' });
+    }
+
+    // Verify the user is either the patient owner or health personnel
+    if (userRole === 'PATIENT' && dossier.patient.id !== userId) {
+      return res.status(403).json({ message: 'Not authorized to delete this dossier' });
+    }
+
+    // First delete all related consultations
+    if (dossier.consultations.length > 0) {
+      await prisma.consultation.deleteMany({
+        where: { dossierId: id }
+      });
+    }
+
+    // Then delete the dossier
+    await prisma.patientDossier.delete({
+      where: { id }
+    });
+
+    res.status(200).json({ message: 'Dossier deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting dossier:', error);
+    res.status(500).json({ 
+      message: 'Failed to delete dossier',
+      error: error.message 
+    });
+  }
+};
 
 // ====================== NEW CONSULTATION CONTROLLERS ======================
 export const createConsultation = async (req, res) => {

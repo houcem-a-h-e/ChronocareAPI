@@ -21,7 +21,8 @@ import {
   updateRendezVousStatut,
   updatePatientProfile,
   addKidToPatient,
-  getPatientRendezVousById
+  getPatientRendezVousById,
+  deletePatientDossier
 } from "../controllers/user.controller.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import  prisma  from "../lib/prisma.js"; // Add this import for the search endpoint
@@ -168,7 +169,7 @@ router.get("/patients/search", verifyToken, async (req, res) => {
 router.get("/patients/:id", verifyToken, getPatientById);
 router.get("/rendezvous/patient/:id", verifyToken, getPatientRendezVousById);
 
-
+router.delete("/dossiers/:id", verifyToken, deletePatientDossier);
 // Consultation routes
 router.post(
   "/consultations",
